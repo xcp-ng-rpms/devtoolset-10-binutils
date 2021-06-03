@@ -4,7 +4,7 @@
 Summary: A GNU collection of binary utilities
 Name: %{?scl_prefix}%{?cross}binutils%{?_with_debug:-debug}
 Version: 2.35
-Release: 3%{?dist}
+Release: 5%{?dist}
 License: GPLv3+
 URL: https://sourceware.org/binutils
 
@@ -249,6 +249,10 @@ Patch25: binutils-aarch64-plt-sh_entsize.patch
 # Lifetime: Fixed in 2.36
 Patch26: binutils-add-sym-cache-to-elf-link-hash.patch
 Patch27: binutils-elf-add-objects.patch
+
+# Purpose:  Remove a vulnerability in the smart_rename function.
+# Lifetime: Fixed in 2.36
+Patch28: binutils-CVE-2021-20197.patch
 
 #----------------------------------------------------------------------------
 
@@ -771,7 +775,7 @@ rm -rf %{buildroot}
   %{_bindir}/%{?cross}ld.bfd %{ld_bfd_priority}
 %{alternatives_cmdline} --install %{_bindir}/%{?cross}ld %{?cross}ld \
   %{_bindir}/%{?cross}ld.gold %{ld_gold_priority}
-%endif # both ld.gold and ld.bfd
+%endif
 
 %if %{isnative}
 /sbin/ldconfig
@@ -782,8 +786,8 @@ rm -rf %{buildroot}
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gprof.info.gz
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/ld.info.gz
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/standards.info.gz
-%endif # with docs
-%endif # isnative
+%endif
+%endif
 
 exit 0
 
@@ -795,7 +799,7 @@ if [ $1 = 0 ]; then
   %{alternatives_cmdline} --remove %{?cross}ld %{_bindir}/%{?cross}ld.bfd
   %{alternatives_cmdline} --remove %{?cross}ld %{_bindir}/%{?cross}ld.gold
 fi
-%endif # both ld.gold and ld.bfd
+%endif
 
 %if %{isnative}
 if [ $1 = 0 ]; then
@@ -808,7 +812,7 @@ if [ $1 = 0 ]; then
     /sbin/install-info --quiet --delete --info-dir=%{_infodir} %{_infodir}/standards.info.gz
   fi
 fi
-%endif # isnative
+%endif
 
 exit 0
 
@@ -881,6 +885,12 @@ exit 0
 
 #----------------------------------------------------------------------------
 %changelog
+* Mon Feb 08 2021 Nick Clifton  <nickc@redhat.com> - 2.35-5
+- Extend vulnerability fix again.  (#1925779)
+
+* Fri Jan 29 2021 Nick Clifton  <nickc@redhat.com> - 2.35-4
+- Fix a vulnerability in the smart_rename function.  (#1920643)
+
 * Tue Aug 11 2020 Nick Clifton  <nickc@redhat.com> - 2.35-3
 - Fix building with LTO enabled.
 - Set the sh_entsize field of the AArch64's PLT section to 0.  (PR 26312)
