@@ -1,0 +1,62 @@
+diff -rup binutils.orig/bfd/elf-bfd.h binutils-2.35/bfd/elf-bfd.h
+--- binutils.orig/bfd/elf-bfd.h	2021-06-23 15:00:33.913477324 +0100
++++ binutils-2.35/bfd/elf-bfd.h	2021-06-23 15:03:42.300235019 +0100
+@@ -1748,6 +1748,11 @@ struct bfd_elf_section_data
+   /* Link from a text section to its .eh_frame_entry section.  */
+   asection *eh_frame_entry;
+ 
++  /* TRUE if the section has secondary reloc sections associated with it.
++     FIXME: In the future it might be better to change this into a list
++     of secondary reloc sections, making lookup easier and faster.  */
++  bfd_boolean has_secondary_relocs;
++
+   /* A pointer used for various section optimizations.  */
+   void *sec_info;
+ };
+diff -rup binutils.orig/bfd/elf.c binutils-2.35/bfd/elf.c
+--- binutils.orig/bfd/elf.c	2021-06-23 15:00:33.902477396 +0100
++++ binutils-2.35/bfd/elf.c	2021-06-23 15:02:36.269672347 +0100
+@@ -12672,6 +12672,7 @@ _bfd_elf_copy_special_section_fields (co
+ {
+   asection * isec;
+   asection * osec;
++  struct bfd_elf_section_data * esd;
+ 
+   if (isection == NULL)
+     return FALSE;
+@@ -12687,8 +12688,9 @@ _bfd_elf_copy_special_section_fields (co
+   if (osec == NULL)
+     return FALSE;
+ 
+-  BFD_ASSERT (elf_section_data (osec)->sec_info == NULL);
+-  elf_section_data (osec)->sec_info = elf_section_data (isec)->sec_info;
++  esd = elf_section_data (osec);
++  BFD_ASSERT (esd->sec_info == NULL);
++  esd->sec_info = elf_section_data (isec)->sec_info;
+   osection->sh_type = SHT_RELA;
+   osection->sh_link = elf_onesymtab (obfd);
+   if (osection->sh_link == 0)
+@@ -12731,6 +12733,10 @@ _bfd_elf_copy_special_section_fields (co
+   osection->sh_info =
+     elf_section_data (isection->bfd_section->output_section)->this_idx;
+ 
++  esd = elf_section_data (isection->bfd_section->output_section);
++  BFD_ASSERT (esd != NULL);
++  osection->sh_info = esd->this_idx;
++  esd->has_secondary_relocs = TRUE;
+ #if DEBUG_SECONDARY_RELOCS
+   fprintf (stderr, "update header of %s, sh_link = %u, sh_info = %u\n",
+ 	   osec->name, osection->sh_link, osection->sh_info);
+diff -rup binutils.orig/bfd/elfcode.h binutils-2.35/bfd/elfcode.h
+--- binutils.orig/bfd/elfcode.h	2021-06-23 15:00:33.910477344 +0100
++++ binutils-2.35/bfd/elfcode.h	2021-06-23 15:04:32.506902070 +0100
+@@ -987,7 +987,8 @@ elf_write_relocs (bfd *abfd, asection *s
+       (*swap_out) (abfd, &src_rela, dst_rela);
+     }
+ 
+-  if (!bed->write_secondary_relocs (abfd, sec))
++  if (elf_section_data (sec)->has_secondary_relocs
++      && !bed->write_secondary_relocs (abfd, sec))
+     {
+       *failedp = TRUE;
+       return;

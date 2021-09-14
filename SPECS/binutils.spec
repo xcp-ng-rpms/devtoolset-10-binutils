@@ -4,7 +4,7 @@
 Summary: A GNU collection of binary utilities
 Name: %{?scl_prefix}%{?cross}binutils%{?_with_debug:-debug}
 Version: 2.35
-Release: 5%{?dist}
+Release: 5%{?dist}.2
 License: GPLv3+
 URL: https://sourceware.org/binutils
 
@@ -253,6 +253,11 @@ Patch27: binutils-elf-add-objects.patch
 # Purpose:  Remove a vulnerability in the smart_rename function.
 # Lifetime: Fixed in 2.36
 Patch28: binutils-CVE-2021-20197.patch
+
+# Purpose:  Remove quadratic performance penalty when processing
+#            files without secondary relocs.
+# Lifetime: Fixed in 2.35.1
+Patch29: binutils-secondary-relocs-speed.patch
 
 #----------------------------------------------------------------------------
 
@@ -885,6 +890,12 @@ exit 0
 
 #----------------------------------------------------------------------------
 %changelog
+* Tue Jul 20 2021 Nick Clifton  <nickc@redhat.com> - 2.35-5.2
+- NVR bump to aloow rebuilding with the correct tag.
+
+* Thu Jul 15 2021 Nick Clifton  <nickc@redhat.com> - 2.35-5.1
+- Remove quadratic performance penalty when processing files without secondary relocs.  (#1981885)
+
 * Mon Feb 08 2021 Nick Clifton  <nickc@redhat.com> - 2.35-5
 - Extend vulnerability fix again.  (#1925779)
 
