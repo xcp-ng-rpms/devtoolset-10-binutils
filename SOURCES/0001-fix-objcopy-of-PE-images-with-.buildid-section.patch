@@ -1,0 +1,84 @@
+From 610ed3e08f13b3886fd7194fb7a248dee8724685 Mon Sep 17 00:00:00 2001
+Message-Id: <610ed3e08f13b3886fd7194fb7a248dee8724685.1634245773.git.bobby.eshleman@gmail.com>
+From: Jan Beulich <jbeulich@suse.com>
+Date: Fri, 21 Aug 2020 10:28:35 +0200
+Subject: [PATCH] fix objcopy of PE images with .buildid section
+
+Xen Project embeds a build ID in its hypervisor binary (including its
+EFI variant), living in a standalone section. This usually gets placed
+right after .rodata, and due to the rounding done on the (file) size of
+.rodata the two sections appear to overlap (as far as e.g.
+find_section_by_vma() is concerned). With the first byte "found" in
+.rodata, nothing guarantees that the entire debug dir fits in that
+section, leading to apparently random failure of objcopy on such an
+image.
+
+Possible alternatives to the solution chosen:
+- make find_section_by_vma() honor virt_size,
+- correct the recording of sizes elsewhere (ibfd has size == virt_size,
+  while obfd doesn't),
+- fix the linker to avoid producing apparently overlapping sections.
+
+While touching the condition around and the contents of the disgnostic,
+pull it up ahead of the bfd_malloc_and_get_section() call: There's no
+point first obtaining the section contents, in order to then fail.
+---
+ bfd/peXXigen.c | 34 +++++++++++++++++++---------------
+ 2 files changed, 19 insertions(+), 15 deletions(-)
+
+diff --git a/bfd/peXXigen.c b/bfd/peXXigen.c
+index 3c3fa27e020..646ad0f0bf5 100644
+--- a/bfd/peXXigen.c
++++ b/bfd/peXXigen.c
+@@ -2943,29 +2943,33 @@ _bfd_XX_bfd_copy_private_bfd_data_common (bfd * ibfd, bfd * obfd)
+     {
+       bfd_vma addr = ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].VirtualAddress
+ 	+ ope->pe_opthdr.ImageBase;
+-      asection *section = find_section_by_vma (obfd, addr);
++      /* In particular a .buildid section may overlap (in VA space) with
++	 whatever section comes ahead of it (largely because of section->size
++	 representing s_size, not virt_size).  Therefore don't look for the
++	 section containing the first byte, but for that covering the last
++	 one.  */
++      bfd_vma last = addr + ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size - 1;
++      asection *section = find_section_by_vma (obfd, last);
+       bfd_byte *data;
+ 
++      /* PR 17512: file: 0f15796a.  */
++      if (section && addr < section->vma)
++	{
++	  /* xgettext:c-format */
++	  _bfd_error_handler
++	    (_("%pB: Data Directory (%lx bytes at %" PRIx64 ") "
++	       "extends across section boundary at %" PRIx64),
++	     obfd, ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size,
++	     (uint64_t) addr, (uint64_t) section->vma);
++	  return FALSE;
++	}
++
+       if (section && bfd_malloc_and_get_section (obfd, section, &data))
+ 	{
+ 	  unsigned int i;
+ 	  struct external_IMAGE_DEBUG_DIRECTORY *dd =
+ 	    (struct external_IMAGE_DEBUG_DIRECTORY *)(data + (addr - section->vma));
+ 
+-	  /* PR 17512: file: 0f15796a.  */
+-	  if ((unsigned long) ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size
+-	      > section->size - (addr - section->vma))
+-	    {
+-	      /* xgettext:c-format */
+-	      _bfd_error_handler
+-		(_("%pB: Data Directory size (%lx) "
+-		   "exceeds space left in section (%" PRIx64 ")"),
+-		 obfd, ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size,
+-		 (uint64_t) (section->size - (addr - section->vma)));
+-	      free (data);
+-	      return FALSE;
+-	    }
+-
+ 	  for (i = 0; i < ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size
+ 		 / sizeof (struct external_IMAGE_DEBUG_DIRECTORY); i++)
+ 	    {
+-- 
+2.32.0
+

@@ -259,6 +259,13 @@ Patch28: binutils-CVE-2021-20197.patch
 # Lifetime: Fixed in 2.35.1
 Patch29: binutils-secondary-relocs-speed.patch
 
+# XCP-ng v8.2: fix buildid bug in objcopy
+# Purpose: allow building the Xen unified binary by fixing a bug
+#          regarding binaries with .buildid sections
+# Lifetime: Fixed in 2.36
+Patch30: 0001-fix-objcopy-of-PE-images-with-.buildid-section.patch
+
+
 #----------------------------------------------------------------------------
 
 Provides: bundled(libiberty)
@@ -890,6 +897,9 @@ exit 0
 
 #----------------------------------------------------------------------------
 %changelog
+* Tue Oct 19 2021 Bobby Eshleman <bobbyeshleman@gmail.com> - 2.35-5.3
+- Fix error when objcopy'ing PECOFF with .buildid section
+
 * Tue Jul 20 2021 Nick Clifton  <nickc@redhat.com> - 2.35-5.2
 - NVR bump to aloow rebuilding with the correct tag.
 
